@@ -28,6 +28,8 @@ type lookupEntry struct {
 	DestCity    string `toml:"dest_city"`
 	DestLat     string `toml:"dest_lat"`
 	DestLon     string `toml:"dest_lon"`
+	Asn         string `toml:"asn"`
+	AsnOrg      string `toml:"asn_org"`
 }
 
 type GeoIP struct {
@@ -39,6 +41,7 @@ type GeoIP struct {
 
 var cityReader *geoip2.CityReader
 var countryReader *geoip2.CountryReader
+var asnReader *geoip2.ASNReader
 
 func (g *GeoIP) SampleConfig() string {
 	return sampleConfig
@@ -72,6 +75,20 @@ func (g *GeoIP) Apply(metrics ...telegraf.Metric) []telegraf.Metric {
 						}
 						if len(lookup.DestLon) > 0 {
 							point.AddField(lookup.DestLon, record.Location.Longitude)
+						}
+					} else if g.DBType == "asn" {
+						record, err := asnReader.Lookup(net.ParseIP(value.(string)))
+						if err != nil {
+							if err.Error() != "not found" {
+								g.Log.Errorf("GeoIP lookup error: %v", err)
+							}
+							continue
+						}
+						if len(lookup.Asn) > 0 {
+							point.AddField(lookup.Asn, record.AutonomousSystemNumber)
+						}
+						if len(lookup.AsnOrg) > 0 {
+							point.AddField(lookup.AsnOrg, record.AutonomousSystemOrganization)
 						}
 					} else if g.DBType == "country" {
 						record, err := countryReader.Lookup(net.ParseIP(value.(string)))
@@ -108,6 +125,13 @@ func (g *GeoIP) Init() error {
 			return fmt.Errorf("Error opening GeoIP database: %v", err)
 		} else {
 			countryReader = r
+		}
+	} else if g.DBType == "asn" {
+		r, err := geoip2.NewASNReaderFromFile(g.DBPath)
+		if err != nil {
+			return fmt.Errorf("Error opening GeoIP database: %v", err)
+		} else {
+			asnReader = r
 		}
 	} else {
 		return fmt.Errorf("Invalid GeoIP database type specified: %s", g.DBType)

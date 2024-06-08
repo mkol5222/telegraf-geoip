@@ -22,6 +22,7 @@ func main() {
 
 	// Check for settings from a config toml file,
 	err = s.LoadConfig(configFile)
+	// fmt.Fprintf(os.Stderr, "loading config: %s\n", *configFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Err loading input: %s\n", err)
 		os.Exit(1)
